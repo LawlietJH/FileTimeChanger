@@ -3,7 +3,7 @@
 # Versión 1.0.2
 # Probado en Python 3.8.8 - Windows
 # Requisitos: PyQT5 y pywin32
-Comando: python -m pip install PyQT5 pywin32
+Comando: python -m pip install -r requirements.txt
 
 # Ejemplos:
 Al Cargar un archivo podremos ver lo siguiente:
