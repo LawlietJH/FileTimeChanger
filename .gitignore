@@ -1,4 +1,6 @@
 # Others
+versions/*.*
+otro/*.*
 *.exe
 *.cfg
 *.bmp
