@@ -4,13 +4,14 @@
 # pip install PyQt5
 from PyQt5.QtCore import Qt, QDate, QTime, QDateTime, QTimer
 from PyQt5.QtWidgets import (
+	#QMenuBar, QSpinBox,
+	#QVBoxLayout, QHBoxLayout
 	QApplication, QLabel, QMainWindow,
-	QMenuBar, QMenu, QToolBar, QAction,
-	QSpinBox, QVBoxLayout, QHBoxLayout,
+	QMenu, QToolBar, QAction,
 	QPushButton, QWidget, QGridLayout,
 	QDateEdit, QTimeEdit, QFileDialog,
-	QLineEdit, QDateTimeEdit
-)
+	QLineEdit, QDateTimeEdit,
+	QCheckBox, QWidgetAction)
 from PyQt5.QtGui import QIcon, QKeySequence
 
 from functools import partial
@@ -27,10 +28,10 @@ import os
 
 __author__  = 'LawlietJH'				# Desarrollador
 __title__   = 'FileTimeChanger'			# Nombre
-__version__ = 'v1.0.1'					# Versión
+__version__ = 'v1.0.2'					# Versión
 
 #=======================================================================
-# Traido de https://github.com/LawlietJH/Utils
+# Tomado de https://github.com/LawlietJH/Utils
 class Clipboard:				# Manipula el clipboard (Copiar/Pegar)
 	# print(Clipboard.text)		# Pegar: Devuelve el contenido que se haya copiado.
 	@property
@@ -61,9 +62,8 @@ class Clipboard:				# Manipula el clipboard (Copiar/Pegar)
 
 
 class Window(QMainWindow):
-	'''Main Window.'''
+	
 	def __init__(self, parent=None):
-		'''Initializer.'''
 		super().__init__(parent)
 		self.Clipboard = Clipboard()
 		self._createWindow()
@@ -73,6 +73,9 @@ class Window(QMainWindow):
 		self._createToolBars()
 		self._connectActions()
 		self._createStatusBar()
+	
+	#===================================================================
+	# GUI
 	
 	def _createWindow(self):
 		self.setWindowTitle(__title__+' '+__version__ + ' - By: ' + __author__)
@@ -91,30 +94,228 @@ class Window(QMainWindow):
 		self.toFileTime  = lambda epoch: byref(wintypes.FILETIME(self.toTimestamp(epoch) & 0xFFFFFFFF, self.toTimestamp(epoch) >> 32))
 		self.timeToDate  = lambda time: datetime.datetime.fromtimestamp(time).strftime('%Y-%m-%d %H:%M:%S')
 		self.dateToTime  = lambda date: time.mktime(date.timetuple())
-		
-	def getFileTimes(self, filePath: str):
-		return (
-			os.path.getctime(filePath), 
-			os.path.getmtime(filePath),
-			os.path.getatime(filePath)
-		)
 	
-	def toDatetime(
-			self,
-			year: int, month: int, day:   int,
-			hour  = 0, minute = 0, second = 0
-		):
-		
-		return datetime.datetime(
-			year = year, month  = month,  day    = day,
-			hour = hour, minute = minute, second = second
-		)
+	def _createActions(self):
+		#===============================================================
+		# 'File' Actions
+		# Creating action using the first constructor
+		# ~ self.newAction = QAction(self)
+		# ~ self.newAction.setText('&New')
+		# ~ self.newAction.setIcon(QIcon('icons/new.png'))
+		# Creating actions using the second constructor
+		self.openAction = QAction(QIcon('icons/open.png'), '&Open...', self)
+		self.updateWindowAction = QAction(QIcon('icons/restore.png'), '&Restore', self)
+		self.saveAction = QAction(QIcon('icons/save.png'), '&Save', self, enabled=False)
+		self.appendOriginalFileTimeAction = QAction(QIcon('icons/agregar.png'), '&Add FT', enabled=False)
+		self.removeOriginalFileTimeAction = QAction(QIcon('icons/remove.png'),  '&Del FT', enabled=False)
+		self.exitAction = QAction(QIcon('icons/exit.png'), '&Exit', self)
+		#---------------------------------------------------------------
+		# Using Keys
+		self.openAction.setShortcut('Ctrl+O')
+		self.updateWindowAction.setShortcut('F5')
+		self.saveAction.setShortcut('Ctrl+S')
+		self.appendOriginalFileTimeAction.setShortcut('Ctrl+E')
+		self.removeOriginalFileTimeAction.setShortcut('Ctrl+R')
+		self.exitAction.setShortcut('Esc')
+		#---------------------------------------------------------------
+		# Adding 'File' Tips
+		openTip = 'Abre el explorador para cargar un archivo.'
+		self.openAction.setStatusTip(openTip)
+		self.openAction.setToolTip(openTip)
+		updateWindowTip = 'Restaura los campos modificados de Fecha y Hora\n'\
+						  'con los datos actuales del archivo.'
+		self.updateWindowAction.setStatusTip(updateWindowTip)
+		self.updateWindowAction.setToolTip(updateWindowTip)
+		saveTip = 'Cambia los tiempos del archivo\n'\
+				  'y respalda los originales.'
+		self.saveAction.setStatusTip(saveTip)							# Agrega un mensaje a la barra de estatus
+		self.saveAction.setToolTip(saveTip)								# Modifica el mensaje de ayuda que aparece encima
+		appendOriginalFileTimeTip = 'Guarda en el archivo los tiempos originales.'
+		self.appendOriginalFileTimeAction.setStatusTip(appendOriginalFileTimeTip)
+		self.appendOriginalFileTimeAction.setToolTip(appendOriginalFileTimeTip)
+		removeOriginalFileTimeTip = 'Elimina del archivo los tiempos originales.'
+		self.removeOriginalFileTimeAction.setStatusTip(removeOriginalFileTimeTip)
+		self.removeOriginalFileTimeAction.setToolTip(removeOriginalFileTimeTip)
+		#===============================================================
+		# 'Edit' actions
+		self.copyFileNameAction  = QAction(QIcon('icons/copy.png'),   '&Copy',  self, enabled=False)
+		self.pasteFileNameAction = QAction(QIcon('icons/paste.png'),  '&Paste', self)
+		self.cutFileNameAction   = QAction(QIcon('icons/cut.png'),    'C&ut',   self, enabled=False)
+		self.clearFileNameAction = QAction(QIcon('icons/delete.png'), 'C&lear', self, enabled=False)
+		# Find and Replace
+		# ~ self.findAction    = QAction(QIcon('icons/find.png'),    '&Find...',    self)
+		# ~ self.replaceAction = QAction(QIcon('icons/replace.png'), '&Replace...', self)
+		#---------------------------------------------------------------
+		# Using Keys
+		self.copyFileNameAction.setShortcut('Ctrl+Shift+C')
+		self.pasteFileNameAction.setShortcut('Ctrl+Shift+V')
+		self.cutFileNameAction.setShortcut('Ctrl+Shift+X')
+		# Ctrl + Z: Recarga el anterior archivo
+		# Ctrl + Y: Recarga el siguiente archivo
+		self.clearFileNameAction.setShortcut('Ctrl+L')
+		#---------------------------------------------------------------
+		# Adding 'Edit' Tips
+		copyFileNameTip = 'Copia la ruta del archivo cargado.'
+		self.copyFileNameAction.setStatusTip(copyFileNameTip)
+		self.copyFileNameAction.setToolTip(copyFileNameTip)
+		pasteFileNameTip = 'Pega alguna ruta que se haya copiado.'
+		self.pasteFileNameAction.setStatusTip(pasteFileNameTip)
+		self.pasteFileNameAction.setToolTip(pasteFileNameTip)
+		cutFileNameTip = 'Corta la ruta del archivo cargado.'
+		self.cutFileNameAction.setStatusTip(cutFileNameTip)
+		self.cutFileNameAction.setToolTip(cutFileNameTip)
+		clearFileNameTip = 'Limpia el contenido de ruta de archivo.'
+		self.clearFileNameAction.setStatusTip(clearFileNameTip)
+		self.clearFileNameAction.setToolTip(clearFileNameTip)
+		#===============================================================
+		# Check actions
+		self.checkToolBarFileAction = QAction(QIcon('icons/check-false.png'), 'Floating: &File Toolbar', self)# checkable=True, checked=True)
+		self.checkToolBarEditAction = QAction(QIcon('icons/check-false.png'), 'Floating: &Edit Toolbar', self)# checkable=True)
+		self.checkToolBarFileShowNamesAction = QAction(QIcon('icons/check-true.png'), 'Show Names: F&ile Toolbar', self)# checkable=True, checked=True)
+		self.checkToolBarEditShowNamesAction = QAction(QIcon('icons/check-true.png'), 'Show Names: E&dit Toolbar', self)# checkable=True, checked=True)
+		#===============================================================
+		# Help actions
+		self.helpContentAction = QAction(QIcon('icons/help-content.png'), '&Help Content', self)
+		self.aboutAction = QAction(QIcon('icons/about.png'), '&About', self)
 	
-	def changeFileTimes(self, filePath: str, values):
-		# Llamada al Win32 API para modificar los tiempos del archivo
-		handle = windll.kernel32.CreateFileW(filePath, 256, 0, None, 3, 128, None)
-		windll.kernel32.SetFileTime(handle, *values)
-		windll.kernel32.CloseHandle(handle)
+	def _createMenuBar(self):
+		menuBar = self.menuBar()
+		#===============================================================
+		# File menu
+		fileMenu = QMenu('&File', self)
+		menuBar.addMenu(fileMenu)
+		fileMenu.addAction(self.openAction)
+		self.openRecentMenu = fileMenu.addMenu('O&pen Recent')
+		self.openRecentMenu.setIcon(QIcon('icons/open-recent.png'))
+		fileMenu.addAction(self.updateWindowAction)
+		fileMenu.addSeparator()
+		fileMenu.addAction(self.saveAction)
+		fileMenu.addAction(self.appendOriginalFileTimeAction)
+		fileMenu.addAction(self.removeOriginalFileTimeAction)
+		fileMenu.addSeparator()
+		fileMenu.addAction(self.exitAction)
+		#===============================================================
+		# Edit menu
+		editMenu = menuBar.addMenu('&Edit')
+		editMenu.addAction(self.copyFileNameAction)
+		editMenu.addAction(self.pasteFileNameAction)
+		editMenu.addAction(self.cutFileNameAction)
+		editMenu.addSeparator()
+		editMenu.addAction(self.clearFileNameAction)
+		# Find and Replace submenu in the Edit menuS
+		# ~ findMenu = editMenu.addMenu(QIcon('icons/find-replace.png'), '&Find and Replace')
+		# ~ findMenu.addAction(self.findAction)
+		# ~ findMenu.addAction(self.replaceAction)
+		#===============================================================
+		# Check menu
+		checkMenu = menuBar.addMenu('&Check')
+		checkMenu.addAction(self.checkToolBarFileAction)
+		checkMenu.addAction(self.checkToolBarEditAction)
+		checkMenu.addAction(self.checkToolBarFileShowNamesAction)
+		checkMenu.addAction(self.checkToolBarEditShowNamesAction)
+		#===============================================================
+		# Help menu
+		helpMenu = menuBar.addMenu(QIcon('icons/help.png'), '&Help')
+		helpMenu.addAction(self.helpContentAction)
+		helpMenu.addAction(self.aboutAction)
+	
+	def _createToolBars(self):
+		
+		self.fileToolBar = QToolBar('File', self)
+		self.addToolBar(Qt.BottomToolBarArea, self.fileToolBar)
+		self.fileToolBar.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
+		self.fileToolBar.addAction(self.exitAction)
+		self.fileToolBar.addSeparator()
+		self.fileToolBar.addAction(self.openAction)
+		self.fileToolBar.addAction(self.updateWindowAction)
+		self.fileToolBar.addAction(self.saveAction)
+		self.fileToolBar.addSeparator()
+		self.fileToolBar.addAction(self.appendOriginalFileTimeAction)
+		self.fileToolBar.addAction(self.removeOriginalFileTimeAction)
+		self.fileToolBar.setMovable(False)
+		
+		self.editToolBar = QToolBar('Edit', self)
+		self.addToolBar(Qt.BottomToolBarArea, self.editToolBar)
+		self.editToolBar.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
+		self.editToolBar.addAction(self.copyFileNameAction)
+		self.editToolBar.addAction(self.pasteFileNameAction)
+		self.editToolBar.addAction(self.cutFileNameAction)
+		self.editToolBar.addSeparator()
+		self.editToolBar.addAction(self.clearFileNameAction)
+		self.editToolBar.setMovable(False)
+	
+	def _connectActions(self):
+		
+		# Connect File actions
+		self.saveAction.triggered.connect(self.updateFileTimes)
+		self.openAction.triggered.connect(self.openFile)
+		self.openRecentMenu.aboutToShow.connect(self.populateOpenRecent)
+		self.updateWindowAction.triggered.connect(self.updateWindow)
+		self.appendOriginalFileTimeAction.triggered.connect(self.appendOriginalFileTimeAgain)
+		self.removeOriginalFileTimeAction.triggered.connect(self.removeOriginalFileTime)
+		self.exitAction.triggered.connect(self.close)
+		
+		# Connect Edit actions
+		self.copyFileNameAction.triggered.connect(self.copyContent)
+		self.pasteFileNameAction.triggered.connect(self.pasteContent)
+		self.cutFileNameAction.triggered.connect(self.cutContent)
+		self.clearFileNameAction.triggered.connect(self.clearLineFileName)
+		
+		# Connect Check actions
+		self.checkToolBarFileAction.triggered.connect(self.updateMenuCheckFile)
+		self.checkToolBarEditAction.triggered.connect(self.updateMenuCheckEdit)
+		self.checkToolBarFileShowNamesAction.triggered.connect(self.updateMenuCheckFileShowNames)
+		self.checkToolBarEditShowNamesAction.triggered.connect(self.updateMenuCheckEditShowNames)
+		
+		# Buttons:
+		self.buttonOpenFile.clicked.connect(self.openFile)
+		self.btnLoadCurrentTime.clicked.connect(self.updateTimesWithCurrentDateTime)
+		self.btnUpFileTimes.clicked.connect(self.updateFileTimes)
+		self.btnRemoveFileTimes.clicked.connect(self.removeOriginalFileTime)
+		self.btnRestoreFileTimes.clicked.connect(self.restoreOriginalFileTime)
+		
+		# Date and Time Edits
+		self.dateCreated.dateChanged.connect(self.compareTimes)
+		self.dateModified.dateChanged.connect(self.compareTimes)
+		self.dateAccessed.dateChanged.connect(self.compareTimes)
+		self.timeCreated.timeChanged.connect(self.compareTimes)
+		self.timeModified.timeChanged.connect(self.compareTimes)
+		self.timeAccessed.timeChanged.connect(self.compareTimes)
+		
+		# Clock
+		self.timer = QTimer()
+		self.timer.timeout.connect(self.updateClock)
+		self.timer.start(1000)
+	
+	def _createStatusBar(self):
+		self.statusbar = self.statusBar()
+		# Adding a temporary message
+		self.statusbar.showMessage('Ready', 3000)
+		# Adding a permanent message
+		t = QTime.currentTime().toPyTime()
+		t = '{}:{}'.format(str(t.hour).zfill(2),
+						   str(t.minute).zfill(2))
+		self.wcLabel = QLabel(t)
+		self.statusbar.addPermanentWidget(self.wcLabel)
+	
+	def contextMenuEvent(self, event):
+		# Creating a menu object with the central widget as parent
+		menu = QMenu(self)
+		# Populating the menu with actions
+		menu.addAction(self.openAction)
+		menu.addAction(self.clearFileNameAction)
+		menu.addSeparator()
+		menu.addAction(self.copyFileNameAction)
+		menu.addAction(self.pasteFileNameAction)
+		menu.addAction(self.cutFileNameAction)
+		menu.addSeparator()
+		menu.addAction(self.appendOriginalFileTimeAction)
+		menu.addAction(self.removeOriginalFileTimeAction)
+		# Launching the menu
+		menu.exec(event.globalPos())
+	
+	#===================================================================
+	# FileTime Checks
 	
 	def restoreOriginalFileTime(self, fileName=None):
 		
@@ -160,133 +361,6 @@ class Window(QMainWindow):
 		if self.btnRemoveFileTimes.isEnabled():
 			self.originalFileTimeCheck()
 	
-	def compareOriginalTimes(self) -> bool:
-		
-		# Datos actuales del archivo:
-		
-		fileName = self.lineFileName.text()
-		
-		if not fileName: return False
-		
-		# Datos actuales en los campos
-		datetimeC = QDateTime(self.dateCreated.date(),  self.timeCreated.time())
-		datetimeM = QDateTime(self.dateModified.date(), self.timeModified.time())
-		# ~ datetimeA = QDateTime(self.dateAccessed.date(), self.timeAccessed.time())
-		
-		# Datos actuales en los campos originales
-		datetimeCO = self.datetimeCreatedOriginal.dateTime()
-		datetimeMO = self.datetimeModifiedOriginal.dateTime()
-		# ~ datetimeAO = self.datetimeAccessedOriginal.dateTime()
-		
-		dtC = datetimeC == datetimeCO
-		dtM = datetimeM == datetimeMO
-		# ~ dtA = datetimeA == datetimeAO
-		
-		# Será True si la fecha y hora no han sido modificadas en los campos
-		same = dtC and dtM #and dtA
-		
-		self.btnRestoreFileTimes.setEnabled(not same)
-		
-		return same
-	
-	def compareTimes(self) -> bool:
-		
-		# Datos actuales del archivo:
-		
-		fileName = self.lineFileName.text()
-		
-		if not fileName: return
-		
-		timeCraw, timeMraw, timeAraw = self.getFileTimes(fileName)
-		
-		dateC, timeC = self.timeToDate(timeCraw).split(' ')
-		dateM, timeM = self.timeToDate(timeMraw).split(' ')
-		# ~ dateA, timeA = self.timeToDate(timeAraw).split(' ')
-		
-		# ~ print(self.timeToDate(timeMraw))
-		
-		dateCf = QDate(*[int(d) for d in dateC.split('-')])
-		dateMf = QDate(*[int(d) for d in dateM.split('-')])
-		# ~ dateAf = QDate(*[int(d) for d in dateA.split('-')])
-		
-		timeCf = QTime(*[int(t) for t in timeC.split(':')])
-		timeMf = QTime(*[int(t) for t in timeM.split(':')])
-		# ~ timeAf = QTime(*[int(t) for t in timeA.split(':')])
-		
-		#--------------------------------------------------------------
-		
-		# Datos actuales en los campos
-		dateCc = self.dateCreated.date()
-		dateMc = self.dateModified.date()
-		# ~ dateAc = self.dateAccessed.date()
-		
-		timeCc = self.timeCreated.time()
-		timeMc = self.timeModified.time()
-		# ~ timeAc = self.timeAccessed.time()
-		
-		#--------------------------------------------------------------
-		# Comparamos que los tiempos no hayan sido cambiados
-		
-		dateC = dateCf.toPyDate() == dateCc.toPyDate()
-		dateM = dateMf.toPyDate() == dateMc.toPyDate()
-		# ~ dateA = dateAf.toPyDate() == dateAc.toPyDate()
-		sameDate = dateC and dateM #and dateA
-		
-		timeC = timeCf.toPyTime() == timeCc.toPyTime()
-		timeM = timeMf.toPyTime() == timeMc.toPyTime()
-		# ~ timeA = timeAf.toPyTime() == timeAc.toPyTime()
-		sameTime = timeC and timeM #and timeA
-		
-		# Será True si la fecha y hora no han sido modificadas en los campos
-		same = sameDate and sameTime
-		
-		self.btnUpFileTimes.setEnabled(not same)
-		self.saveAction.setEnabled(not same)
-	
-	def originalFileTimeCheck(self):
-		
-		self.appendOriginalFileTime()
-		
-		if self.originalFileTime and self.lineFileName.text():
-			
-			datetimeC = self.originalFileTime['Created']
-			datetimeM = self.originalFileTime['Modified']
-			datetimeA = self.originalFileTime['Accessed']
-			
-			datetimeC = datetimeC.split(' ')
-			datetimeC = datetimeC[0].split('-') + datetimeC[1].split(':')
-			datetimeC = QDateTime(*[int(d) for d in datetimeC])
-			
-			datetimeM = datetimeM.split(' ')
-			datetimeM = datetimeM[0].split('-') + datetimeM[1].split(':')
-			datetimeM = QDateTime(*[int(d) for d in datetimeM])
-			
-			datetimeA = datetimeA.split(' ')
-			datetimeA = datetimeA[0].split('-') + datetimeA[1].split(':')
-			datetimeA = QDateTime(*[int(d) for d in datetimeA])
-			
-			self.datetimeCreatedOriginal.setDateTime(datetimeC)
-			self.datetimeModifiedOriginal.setDateTime(datetimeM)
-			# ~ self.datetimeAccessedOriginal.setDateTime(datetimeA)
-			
-			if not self.compareOriginalTimes():
-				self.datetimeCreatedOriginal.setEnabled(True)
-				self.datetimeModifiedOriginal.setEnabled(True)
-				# ~ self.datetimeAccessedOriginal.setEnabled(True)
-			else:
-				self.datetimeCreatedOriginal.setEnabled(False)
-				self.datetimeModifiedOriginal.setEnabled(False)
-				# ~ self.datetimeAccessedOriginal.setEnabled(False)
-		else:
-			
-			self.datetimeCreatedOriginal.setDateTime(QDateTime(2000, 1, 1, 0, 0, 0))
-			self.datetimeModifiedOriginal.setDateTime(QDateTime(2000, 1, 1, 0, 0, 0))
-			# ~ self.datetimeAccessedOriginal.setDateTime(QDateTime(2000, 1, 1, 0, 0, 0))
-			
-			self.datetimeCreatedOriginal.setEnabled(False)
-			self.datetimeModifiedOriginal.setEnabled(False)
-			# ~ self.datetimeAccessedOriginal.setEnabled(False)
-	
 	def updateFileTimes(self):
 		
 		fileName = self.lineFileName.text()
@@ -324,7 +398,7 @@ class Window(QMainWindow):
 			'minute': timeM.minute,
 			'second': timeM.second
 		}
-		# ~ print(modified)
+		
 		accessed = {
 			'year':   dateA.year,
 			'month':  dateA.month,
@@ -352,10 +426,86 @@ class Window(QMainWindow):
 		self.statusbar.showMessage('Actualizado.', 3000)
 		self.compareTimes()
 	
+	def compareOriginalTimes(self) -> bool:
+		
+		# Datos actuales del archivo:
+		fileName = self.lineFileName.text()
+		if not fileName: return False
+		
+		# Datos actuales en los campos
+		datetimeC = QDateTime(self.dateCreated.date(),  self.timeCreated.time()).toPyDateTime()
+		datetimeM = QDateTime(self.dateModified.date(), self.timeModified.time()).toPyDateTime()
+		# ~ datetimeA = QDateTime(self.dateAccessed.date(), self.timeAccessed.time()).toPyDateTime()
+		
+		datetimeC = datetime.datetime(datetimeC.year, datetimeC.month, datetimeC.day, datetimeC.hour, datetimeC.minute, datetimeC.second)
+		datetimeM = datetime.datetime(datetimeM.year, datetimeM.month, datetimeM.day, datetimeM.hour, datetimeM.minute, datetimeM.second)
+		# ~ datetimeA = datetime.datetime(datetimeA.year, datetimeA.month, datetimeA.day, datetimeA.hour, datetimeA.minute, datetimeA.second)
+		
+		# Datos actuales en los campos originales
+		datetimeCO = self.datetimeCreatedOriginal.dateTime().toPyDateTime()
+		datetimeMO = self.datetimeModifiedOriginal.dateTime().toPyDateTime()
+		# ~ datetimeAO = self.datetimeAccessedOriginal.dateTime().toPyDateTime()
+		
+		dtC = datetimeC == datetimeCO
+		dtM = datetimeM == datetimeMO
+		# ~ dtA = datetimeA == datetimeAO
+		
+		# Será True si la fecha y hora no han sido modificadas en los campos
+		same = dtC and dtM #and dtA
+		
+		self.btnRestoreFileTimes.setEnabled(not same)
+		
+		return same
+	
+	def originalFileTimeCheck(self):
+		
+		self.appendOriginalFileTime()
+		
+		if self.originalFileTime and self.lineFileName.text():
+			
+			datetimeC = self.originalFileTime['Created']
+			datetimeM = self.originalFileTime['Modified']
+			# ~ datetimeA = self.originalFileTime['Accessed']
+			
+			datetimeC = datetimeC.split(' ')
+			datetimeC = datetimeC[0].split('-') + datetimeC[1].split(':')
+			datetimeC = QDateTime(*[int(d) for d in datetimeC])
+			
+			datetimeM = datetimeM.split(' ')
+			datetimeM = datetimeM[0].split('-') + datetimeM[1].split(':')
+			datetimeM = QDateTime(*[int(d) for d in datetimeM])
+			
+			# ~ datetimeA = datetimeA.split(' ')
+			# ~ datetimeA = datetimeA[0].split('-') + datetimeA[1].split(':')
+			# ~ datetimeA = QDateTime(*[int(d) for d in datetimeA])
+			
+			self.datetimeCreatedOriginal.setDateTime(datetimeC)
+			self.datetimeModifiedOriginal.setDateTime(datetimeM)
+			# ~ self.datetimeAccessedOriginal.setDateTime(datetimeA)
+			
+			if not self.compareOriginalTimes():
+				
+				self.datetimeCreatedOriginal.setEnabled(True)
+				self.datetimeModifiedOriginal.setEnabled(True)
+				# ~ self.datetimeAccessedOriginal.setEnabled(True)
+			else:
+				
+				self.datetimeCreatedOriginal.setEnabled(False)
+				self.datetimeModifiedOriginal.setEnabled(False)
+				# ~ self.datetimeAccessedOriginal.setEnabled(False)
+		else:
+			
+			self.datetimeCreatedOriginal.setDateTime(QDateTime(2000, 1, 1, 0, 0, 0))
+			self.datetimeModifiedOriginal.setDateTime(QDateTime(2000, 1, 1, 0, 0, 0))
+			# ~ self.datetimeAccessedOriginal.setDateTime(QDateTime(2000, 1, 1, 0, 0, 0))
+			
+			# ~ self.datetimeAccessedOriginal.setEnabled(False)
+			self.datetimeCreatedOriginal.setEnabled(False)
+			self.datetimeModifiedOriginal.setEnabled(False)
+	
 	def updateTimes(self, fileName: str):
 		
 		# Estrae los tiempos del archivo:
-		
 		timeCraw, timeMraw, timeAraw = self.getFileTimes(fileName)
 		dateC, timeC = self.timeToDate(timeCraw).split(' ')
 		dateM, timeM = self.timeToDate(timeMraw).split(' ')
@@ -377,14 +527,65 @@ class Window(QMainWindow):
 		self.timeModified.setTime(timeM)
 		self.timeAccessed.setTime(timeA)
 		
-		# ~ print(self.dateModified.date(), self.timeModified.time())
-		
 		if self.btnRemoveFileTimes.isEnabled():
 			self.originalFileTimeCheck()
 	
-	def _createGrid(self): # https://zetcode.com/gui/pyqt5/layout/
+	def compareTimes(self) -> bool:
 		
-		self.grid = QGridLayout()
+		# Datos actuales del archivo:
+		fileName = self.lineFileName.text()
+		if not fileName: return
+		
+		timeCraw, timeMraw, timeAraw = self.getFileTimes(fileName)
+		
+		dateC, timeC = self.timeToDate(timeCraw).split(' ')
+		dateM, timeM = self.timeToDate(timeMraw).split(' ')
+		# ~ dateA, timeA = self.timeToDate(timeAraw).split(' ')
+		
+		dateCf = QDate(*[int(d) for d in dateC.split('-')]).toPyDate()
+		dateMf = QDate(*[int(d) for d in dateM.split('-')]).toPyDate()
+		# ~ dateAf = QDate(*[int(d) for d in dateA.split('-')]).toPyDate()
+		
+		timeCf = QTime(*[int(t) for t in timeC.split(':')]).toPyTime()
+		timeMf = QTime(*[int(t) for t in timeM.split(':')]).toPyTime()
+		# ~ timeAf = QTime(*[int(t) for t in timeA.split(':')]).toPyTime()
+		
+		#--------------------------------------------------------------
+		
+		# Datos actuales en los campos
+		dateCc = self.dateCreated.date().toPyDate()
+		dateMc = self.dateModified.date().toPyDate()
+		# ~ dateAc = self.dateAccessed.date().toPyDate()
+		
+		timeCc = self.timeCreated.time().toPyTime()
+		timeCc = datetime.time(timeCc.hour, timeCc.minute, timeCc.second)
+		timeMc = self.timeModified.time().toPyTime()
+		timeMc = datetime.time(timeMc.hour, timeMc.minute, timeMc.second)
+		# ~ timeAc = self.timeAccessed.time().toPyTime()
+		# ~ timeAc = datetime.time(timeMc.hour, timeMc.minute, timeMc.second)
+		
+		#--------------------------------------------------------------
+		# Comparamos que los tiempos no hayan sido cambiados
+		
+		dateC = dateCf == dateCc
+		dateM = dateMf == dateMc
+		# ~ dateA = dateAf.toPyDate() == dateAc.toPyDate()
+		sameDate = dateC and dateM #and dateA
+		
+		timeC = timeCf == timeCc
+		timeM = timeMf == timeMc
+		# ~ timeA = timeAf == timeAc
+		sameTime = timeC and timeM #and timeA
+		
+		# Será True si la fecha y hora no han sido modificadas en los campos
+		same = sameDate and sameTime
+		
+		self.btnUpFileTimes.setEnabled(not same)
+		self.saveAction.setEnabled(not same)
+	
+	def _createGrid(self):
+		
+		self.grid = QGridLayout()	# https://zetcode.com/gui/pyqt5/layout/
 		
 		w = QWidget()
 		w.setLayout(self.grid)
@@ -403,9 +604,11 @@ class Window(QMainWindow):
 		
 		# Pos: 0, 4
 		self.buttonOpenFile = QPushButton(
-			QIcon('icons/open.png'),
+			QIcon('icons/find.png'),
 			'Cargar Archivo...'
 		)
+		# ~ self.buttonOpenFile.hide()
+		# ~ self.buttonOpenFile.show()
 		
 		#---------------------------------------------------------------
 		
@@ -428,7 +631,7 @@ class Window(QMainWindow):
 		# ~ self.timeCreated.setTime(QTime(0, 0, 0))
 		
 		# Pos: 1, 3
-		self.labelCreatedOriginal = QLabel('Original:')
+		self.labelCreatedOriginal = QLabel('FT Original:')
 		# ~ self.labelCreatedOriginal.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
 		# ~ self.labelCreatedOriginal.setVisible(True)
 		self.labelCreatedOriginal.setEnabled(False)
@@ -459,7 +662,7 @@ class Window(QMainWindow):
 		self.timeModified.setTime(QTime.currentTime())
 		
 		# Pos: 2, 3
-		self.labelModifiedOriginal = QLabel('Original:')
+		self.labelModifiedOriginal = QLabel('FT Original:')
 		self.labelModifiedOriginal.setEnabled(False)
 		
 		# Pos: 2, 4
@@ -501,23 +704,31 @@ class Window(QMainWindow):
 		# Pos: 3, 4
 		self.btnRemoveFileTimes = QPushButton(
 			QIcon('icons/remove.png'),
-			'Elimina Datos Cargados'
+			'Elimina Tiempos Originales'
 			)
-		# ~ self.btnRestoreFileTimes.hide()
 		self.btnRemoveFileTimes.setEnabled(False)
 		self.btnRemoveFileTimes.setToolTip(
-			'Elimina la informacíon de los tiempos\n'
-			'originales agregados al archivo.'
+			'Elimina del archivo los\n'
+			'tiempos originales.'
 		)
 		
 		#---------------------------------------------------------------
 		
-		# Pos: 4, 3
+		# Pos: 4, 1
+		self.btnLoadCurrentTime = QPushButton(
+			QIcon('icons/update.png'),
+			'Actualizar'
+			)
+		self.btnLoadCurrentTime.setToolTip(
+			'Agrega la fecha y hora actual\n'
+			'en los campos.'
+		)
+		
+		# Pos: 4, 2
 		self.btnUpFileTimes = QPushButton(
 			QIcon('icons/save.png'),
 			'Cambiar Datos'
 			)
-		# ~ self.btnUpFileTimes.hide()
 		self.btnUpFileTimes.setEnabled(False)
 		self.btnUpFileTimes.setToolTip(
 			'Cambia los tiempos del archivo\n'
@@ -529,7 +740,6 @@ class Window(QMainWindow):
 			QIcon('icons/reload.png'),
 			'Restaurar Datos Originales'
 			)
-		# ~ self.btnRestoreFileTimes.hide()
 		self.btnRestoreFileTimes.setEnabled(False)
 		self.btnRestoreFileTimes.setToolTip(
 			'Restaura los tiempos del archivo\n'
@@ -563,218 +773,31 @@ class Window(QMainWindow):
 		self.grid.addWidget(labelAccessed,       3, 0, alignment=Qt.AlignRight)
 		self.grid.addWidget(self.timeAccessed,   3, 1)
 		self.grid.addWidget(self.dateAccessed,   3, 2)
+		self.grid.addWidget(self.btnLoadCurrentTime, 4, 1)
 		self.grid.addWidget(self.btnUpFileTimes, 4, 2)
+		
 		self.grid.addWidget(self.labelCreatedOriginal,     1, 3, alignment=Qt.AlignRight)
 		self.grid.addWidget(self.datetimeCreatedOriginal,  1, 4)
 		self.grid.addWidget(self.labelModifiedOriginal,    2, 3, alignment=Qt.AlignRight)
 		self.grid.addWidget(self.datetimeModifiedOriginal, 2, 4)
-		# ~ self.grid.addWidget(self.labelAccessedOriginal,    3, 3, alignment=Qt.AlignRight)
-		# ~ self.grid.addWidget(self.datetimeAccessedOriginal, 3, 4)
-		# ~ self.grid.addWidget(self., 3, 3,)
 		self.grid.addWidget(self.btnRemoveFileTimes,  3, 4)
 		self.grid.addWidget(self.btnRestoreFileTimes, 4, 4)
 	
-	#---------------------------------------------------------------
+	#===================================================================
+	# FileTime Controllers
 	
-	def _createActions(self):
+	def appendOriginalFileTimeAgain(self):
 		
-		# Creating action using the first constructor
-		self.newAction = QAction(self)
-		# ~ self.newAction.setText('&New')
-		# ~ self.newAction.setIcon(QIcon('icons/new.png'))
-		
-		# Creating actions using the second constructor
-		self.saveAction = QAction(QIcon('icons/save.png'), '&Save', self)
-		self.saveAction.setEnabled(False)
-		self.openAction = QAction(QIcon('icons/open.png'), '&Open...', self)
-		self.updateWindowAction = QAction(QIcon('icons/restore.png'), '&Restore', self)
-		self.exitAction = QAction(QIcon('icons/exit.png'), '&Exit', self)
-		
-		# Using string-based key sequences
-		self.saveAction.setShortcut('Ctrl+S')
-		self.openAction.setShortcut('Ctrl+O')
-		self.updateWindowAction.setShortcut('F5')
-		self.exitAction.setShortcut('Esc')
-		
-		# Adding help tips
-		saveTip = 'Cambia los tiempos del archivo\n'\
-				  'y respalda los originales.'
-		self.saveAction.setStatusTip(saveTip)							# Agrega un mensaje a la barra de estatus
-		self.saveAction.setToolTip(saveTip)								# Modifica el mensaje de ayuda que aparece encima
-		
-		openTip = 'Abre el explorador para cargar un archivo.'
-		self.openAction.setStatusTip(openTip)
-		self.openAction.setToolTip(openTip)
-		
-		updateWindowTip = 'Restaura los campos modificados de Fecha y Hora\n'\
-						  'con los datos actuales del archivo.'
-		self.updateWindowAction.setStatusTip(updateWindowTip)
-		self.updateWindowAction.setToolTip(updateWindowTip)
-		
-		# Edit actions
-		self.copyAction  = QAction(QIcon('icons/copy.png'),  '&Copy',  self)
-		self.pasteAction = QAction(QIcon('icons/paste.png'), '&Paste', self)
-		self.cutAction   = QAction(QIcon('icons/cut.png'),   'C&ut',   self)
-		self.clearFileNameAction = QAction(QIcon('icons/delete.png'), 'C&lear',   self)
-		
-		copyTip = 'Copia la ruta del archivo cargado.'
-		self.copyAction.setStatusTip(copyTip)
-		self.copyAction.setToolTip(copyTip)
-		
-		pasteTip = 'Pega alguna ruta que se haya copiado.'
-		self.pasteAction.setStatusTip(pasteTip)
-		self.pasteAction.setToolTip(pasteTip)
-		
-		cutTip = 'Corta la ruta del archivo cargado.'
-		self.cutAction.setStatusTip(cutTip)
-		self.cutAction.setToolTip(cutTip)
-		
-		
-		# Using standard keys
-		self.copyAction.setShortcut('Ctrl+Shift+C')
-		self.pasteAction.setShortcut('Ctrl+Shift+V')
-		self.cutAction.setShortcut('Ctrl+Shift+X')
-		# Ctrl + Z: Recarga el anterior archivo
-		# Ctrl + Y: Recarga el siguiente archivo
-		self.clearFileNameAction.setShortcut('Ctrl+L')
-		
-		clearFileNameTip = 'Limpia el contenido de ruta de archivo.'
-		self.clearFileNameAction.setStatusTip(clearFileNameTip)
-		self.clearFileNameAction.setToolTip(clearFileNameTip)
-		
-		# Find and Replace
-		# ~ self.findAction    = QAction(QIcon('icons/find.png'),    '&Find...',    self)
-		# ~ self.replaceAction = QAction(QIcon('icons/replace.png'), '&Replace...', self)
-		
-		# Help actions
-		self.helpContentAction = QAction(QIcon('icons/help-content.png'), '&Help Content', self)
-		self.aboutAction = QAction(QIcon('icons/about.png'), '&About', self)
-	
-	def _createMenuBar(self):
-		menuBar = self.menuBar()
-		# File menu
-		fileMenu = QMenu('&File', self)
-		menuBar.addMenu(fileMenu)
-		fileMenu.addAction(self.saveAction)
-		fileMenu.addAction(self.openAction)
-		
-		# Adding an Open Recent submenu
-		self.openRecentMenu = fileMenu.addMenu('Open &Recent')
-		self.openRecentMenu.setIcon(QIcon('icons/open-recent.png'))
-		
-		fileMenu.addAction(self.updateWindowAction)
-		fileMenu.addSeparator()
-		fileMenu.addAction(self.exitAction)
-		# Edit menu
-		editMenu = menuBar.addMenu('&Edit')
-		editMenu.addAction(self.copyAction)
-		editMenu.addAction(self.pasteAction)
-		editMenu.addAction(self.cutAction)
-		editMenu.addSeparator()
-		editMenu.addAction(self.clearFileNameAction)
-		# Find and Replace submenu in the Edit menuS
-		# ~ findMenu = editMenu.addMenu(QIcon('icons/find-replace.png'), '&Find and Replace')
-		# ~ findMenu.addAction(self.findAction)
-		# ~ findMenu.addAction(self.replaceAction)
-		# ~ # Help menu
-		helpMenu = menuBar.addMenu(QIcon('icons/help.png'), '&Help')
-		helpMenu.addAction(self.helpContentAction)
-		helpMenu.addAction(self.aboutAction)
-	
-	def _createToolBars(self):
-		# Using a title
-		# ~ toolsToolBar = self.addToolBar('Tools')
-		# ~ self.spinBoxNum = QSpinBox()
-		# ~ self.spinBoxNum.setFocusPolicy(Qt.NoFocus)
-		# ~ toolsToolBar.addWidget(self.spinBoxNum)
-		
-		fileToolBar = QToolBar('File', self)
-		self.addToolBar(Qt.BottomToolBarArea, fileToolBar)
-		# ~ fileToolBar.setAllowedAreas(Qt.LeftToolBarArea | Qt.RightToolBarArea)
-		fileToolBar.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
-		fileToolBar.addAction(self.exitAction)
-		fileToolBar.addAction(self.clearFileNameAction)
-		fileToolBar.addAction(self.openAction)
-		fileToolBar.addAction(self.updateWindowAction)
-		fileToolBar.addAction(self.saveAction)
-		fileToolBar.setMovable(True)
-		
-		editToolBar = QToolBar('Edit', self)
-		self.addToolBar(Qt.RightToolBarArea, editToolBar)
-		editToolBar.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
-		editToolBar.addAction(self.copyAction)
-		editToolBar.addAction(self.pasteAction)
-		editToolBar.addAction(self.cutAction)
-	
-	def contextMenuEvent(self, event):
-		# Creating a menu object with the central widget as parent
-		menu = QMenu(self)
-		# Populating the menu with actions
-		menu.addAction(self.openAction)
-		
-		# ~ # Creating a separator action
-		# ~ separator = QAction(self)
-		# ~ separator.setSeparator(True)
-		# ~ # Adding the separator to the menu
-		# ~ menu.addAction(separator)
-		
-		menu.addAction(self.clearFileNameAction)
-		menu.addSeparator()
-		menu.addAction(self.copyAction)
-		menu.addAction(self.pasteAction)
-		menu.addAction(self.cutAction)
-		# Launching the menu
-		menu.exec(event.globalPos())
-	
-	def _connectActions(self):
-		
-		# Connect File actions
-		self.saveAction.triggered.connect(self.updateFileTimes)
-		self.openAction.triggered.connect(self.openFile)
-		self.openRecentMenu.aboutToShow.connect(self.populateOpenRecent)
-		self.updateWindowAction.triggered.connect(self.updateWindow)
-		self.exitAction.triggered.connect(self.close)
-		
-		# Connect Edit actions
-		self.copyAction.triggered.connect(self.copyContent)
-		self.pasteAction.triggered.connect(self.pasteContent)
-		self.cutAction.triggered.connect(self.cutContent)
-		self.clearFileNameAction.triggered.connect(self.clearLineFileName)
-		
-		self.buttonOpenFile.clicked.connect(self.openFile)
-		self.btnUpFileTimes.clicked.connect(self.updateFileTimes)
-		self.btnRemoveFileTimes.clicked.connect(self.removeOriginalFileTime)
-		self.btnRestoreFileTimes.clicked.connect(self.restoreOriginalFileTime)
-		
-		self.dateCreated.dateChanged.connect(self.compareTimes)
-		self.dateModified.dateChanged.connect(self.compareTimes)
-		self.dateAccessed.dateChanged.connect(self.compareTimes)
-		
-		self.timeCreated.timeChanged.connect(self.compareTimes)
-		self.timeModified.timeChanged.connect(self.compareTimes)
-		self.timeAccessed.timeChanged.connect(self.compareTimes)
-		
-		self.timer = QTimer()
-		self.timer.timeout.connect(self.updateClock)
-		self.timer.start(1000)
-	
-	def _createStatusBar(self):
-		self.statusbar = self.statusBar()
-		# Adding a temporary message
-		self.statusbar.showMessage('Ready', 3000)
-		# Adding a permanent message
-		t = QTime.currentTime().toPyTime()
-		t = '{}:{}'.format(str(t.hour).zfill(2),
-						   str(t.minute).zfill(2))
-		self.wcLabel = QLabel(t)
-		self.statusbar.addPermanentWidget(self.wcLabel)
-	
-	#-------------------------------------------------------------------
+		self.btnRemoveFileTimes.setEnabled(True)
+		self.appendOriginalFileTimeAction.setEnabled(False)
+		self.removeOriginalFileTimeAction.setEnabled(True)
+		self.appendOriginalFileTime()
 	
 	def appendOriginalFileTime(self, fileName=None):
 		
 		if not fileName: fileName = self.lineFileName.text()
-		if not os.path.isfile(fileName): return
+		if not os.path.isfile(fileName):
+			return
 		
 		self.originalFileTime = self.extractOriginalFileTime(fileName)
 		if self.originalFileTime:
@@ -794,69 +817,84 @@ class Window(QMainWindow):
 		jsonFileTimes = json.dumps(fileTimes).encode()
 		jsonFileTimes = bz2.compress(jsonFileTimes)
 		
-		with open(fileName, 'rb') as f:
-			data = f.read()
+		# ~ with open(fileName+':FTC', 'rb') as f:
+			# ~ data = f.read()
 		
-		with open(fileName, 'wb') as f:
-			f.write(data)
-			f.write(b'\n')
+		with open(fileName+':FTC', 'wb') as f:
+			# ~ f.write(data)
+			# ~ f.write(b'\n')
 			f.write(self.HEADERFILE)
 			f.write(jsonFileTimes)
 		
 		self.originalFileTime = fileTimes
 		self.updateFileTimes()
-		
 	
 	def extractOriginalFileTime(self, fileName=None):
 		
 		if not fileName: fileName = self.lineFileName.text()
 		if not os.path.isfile(fileName):
 			self.btnRemoveFileTimes.setEnabled(False)
+			self.appendOriginalFileTimeAction.setEnabled(False)
+			self.removeOriginalFileTimeAction.setEnabled(False)
 			return
 		
-		# ~ # Extraer datos añadidos del archivo
-		with open(fileName, 'rb') as f:
+		if not os.path.isfile(fileName+':FTC'): return
+		
+		# Extraer datos añadidos del archivo
+		with open(fileName+':FTC', 'rb') as f:
 			
 			data = b''
-			lines = self.getLastLines(fileName, 8)
+			lines = self.getLastLines(fileName+':FTC', 16)
 			for line in lines:
 				data += line + b'\n'
 			
 			data = data.split(self.HEADERFILE)
 			
 			if len(data) == 2:
-				data = bz2.decompress(data[1]).decode()
+				try: data = bz2.decompress(data[1]).decode()
+				except OSError:
+					f.close()
+					self.removeOriginalFileTime()#update=False)
+					return
 				data = json.loads(data)
 				self.btnRemoveFileTimes.setEnabled(True)
+				self.appendOriginalFileTimeAction.setEnabled(False)
+				self.removeOriginalFileTimeAction.setEnabled(True)
 				return data
 			else:
 				self.btnRemoveFileTimes.setEnabled(False)
+				self.appendOriginalFileTimeAction.setEnabled(True)
+				self.removeOriginalFileTimeAction.setEnabled(False)
 				return
 		
-	def removeOriginalFileTime(self, fileName=None):
+	def removeOriginalFileTime(self, fileName=None, update=True):
 		
 		if not fileName: fileName = self.lineFileName.text()
 		if not os.path.isfile(fileName): return
 		
-		# Eliminar datos añadidos al archivo:
-		with open(fileName, 'rb') as f:
-			data = f.read()
-			data = data.split(b'\n'+self.HEADERFILE)
-			if not len(data) == 2:
-				return False
-		
-		with open(fileName, 'wb') as f:
-			f.write(data.pop(0))
+		if os.path.isfile(fileName+':FTC'):
+			os.remove(fileName+':FTC')
 			self.datetimeCreatedOriginal.setEnabled(False)
 			self.datetimeModifiedOriginal.setEnabled(False)
 			self.datetimeCreatedOriginal.setDateTime(QDateTime(2000, 1, 1, 0, 0, 0))
 			self.datetimeModifiedOriginal.setDateTime(QDateTime(2000, 1, 1, 0, 0, 0))
 			self.btnRemoveFileTimes.setEnabled(False)
+			self.appendOriginalFileTimeAction.setEnabled(True)
+			self.removeOriginalFileTimeAction.setEnabled(False)
 			self.btnRestoreFileTimes.setEnabled(False)
-			self.updateFileTimes()
+			if update: self.updateFileTimes()
 			return True
 	
-	#-------------------------------------------------------------------
+	#===================================================================
+	# Action Functions
+	
+	def updateTimesWithCurrentDateTime(self):
+		self.dateCreated.setDate(QDate.currentDate())
+		self.dateModified.setDate(QDate.currentDate())
+		self.dateAccessed.setDate(QDate.currentDate())
+		self.timeCreated.setTime(QTime.currentTime())
+		self.timeModified.setTime(QTime.currentTime())
+		self.timeAccessed.setTime(QTime.currentTime())
 	
 	def updateWindow(self):
 		if self.lineFileName.text():
@@ -872,10 +910,7 @@ class Window(QMainWindow):
 	
 	def updateClock(self):
 		
-		t = QTime.currentTime().toPyTime()
-		t = '{}:{}'.format(str(t.hour).zfill(2),
-						   str(t.minute).zfill(2))
-		
+		t = datetime.datetime.now().strftime('%H:%M')
 		self.wcLabel.setText(t)
 		
 		if not self.lineFileName.text():
@@ -914,6 +949,12 @@ class Window(QMainWindow):
 			self.updateTimes(fileName)
 			self.originalFileTimeCheck()
 			self.btnRemoveFileTimes.setEnabled(True)
+			self.appendOriginalFileTimeAction.setEnabled(False)
+			self.removeOriginalFileTimeAction.setEnabled(True)
+			
+			self.copyFileNameAction.setEnabled(True)
+			self.cutFileNameAction.setEnabled(True)
+			self.clearFileNameAction.setEnabled(True)
 	
 	def openRecentFile(self, fileName):
 		if not fileName == 'Vacío':
@@ -923,6 +964,10 @@ class Window(QMainWindow):
 			self.listRecentFiles.pop(pos)
 			self.listRecentFiles.append(fileName)
 			self.originalFileTimeCheck()
+			
+			self.copyFileNameAction.setEnabled(True)
+			self.cutFileNameAction.setEnabled(True)
+			self.clearFileNameAction.setEnabled(True)
 	
 	def cleanRecentFiles(self):
 		self.openRecentMenu.clear()
@@ -981,7 +1026,7 @@ class Window(QMainWindow):
 	
 	def pasteContent(self):
 		text = self.Clipboard.text
-		if os.path.isfile(text):
+		if os.path.isfile(text) and not text.endswith(':FTC'):
 			if not text == self.lineFileName.text():
 				self.openFile(text)
 				self.statusbar.showMessage('Ruta de Archivo pegada.', 3000)
@@ -1004,13 +1049,20 @@ class Window(QMainWindow):
 	def clearLineFileName(self):
 		self.lineFileName.setText('')
 		self.btnUpFileTimes.setEnabled(False)
+		self.saveAction.setEnabled(False)
 		
 		self.datetimeCreatedOriginal.setEnabled(False)
 		self.datetimeModifiedOriginal.setEnabled(False)
 		self.datetimeCreatedOriginal.setDateTime(QDateTime(2000, 1, 1, 0, 0, 0))
 		self.datetimeModifiedOriginal.setDateTime(QDateTime(2000, 1, 1, 0, 0, 0))
 		self.btnRemoveFileTimes.setEnabled(False)
+		self.appendOriginalFileTimeAction.setEnabled(False)
+		self.removeOriginalFileTimeAction.setEnabled(False)
 		self.btnRestoreFileTimes.setEnabled(False)
+		
+		self.copyFileNameAction.setEnabled(False)
+		self.cutFileNameAction.setEnabled(False)
+		self.clearFileNameAction.setEnabled(False)
 		
 		self.dateCreated.setDate(QDate.currentDate())
 		self.dateModified.setDate(QDate.currentDate())
@@ -1019,8 +1071,45 @@ class Window(QMainWindow):
 		self.timeModified.setTime(QTime.currentTime())
 		self.timeAccessed.setTime(QTime.currentTime())
 	
+	def updateMenuCheckFile(self):
+		isMovable = not self.fileToolBar.isMovable()
+		self.fileToolBar.setMovable(isMovable)
+		if isMovable:
+			 self.checkToolBarFileAction.setIcon(QIcon('icons/check-true.png'))
+		else:
+			 self.checkToolBarFileAction.setIcon(QIcon('icons/check-false.png'))
+	
+	def updateMenuCheckEdit(self):
+		isMovable = not self.editToolBar.isMovable()
+		self.editToolBar.setMovable(isMovable)
+		if isMovable:
+			 self.checkToolBarEditAction.setIcon(QIcon('icons/check-true.png'))
+		else:
+			 self.checkToolBarEditAction.setIcon(QIcon('icons/check-false.png'))
+	
+	def updateMenuCheckFileShowNames(self):
+		btnStyle = self.fileToolBar.toolButtonStyle()
+		if btnStyle == Qt.ToolButtonTextUnderIcon:
+			self.checkToolBarFileShowNamesAction.setIcon(QIcon('icons/check-false.png'))
+			self.fileToolBar.setToolButtonStyle(Qt.ToolButtonIconOnly)
+		else:
+			self.checkToolBarFileShowNamesAction.setIcon(QIcon('icons/check-true.png'))
+			self.fileToolBar.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
+	
+	def updateMenuCheckEditShowNames(self):
+		btnStyle = self.editToolBar.toolButtonStyle()
+		if btnStyle == Qt.ToolButtonTextUnderIcon:
+			self.checkToolBarEditShowNamesAction.setIcon(QIcon('icons/check-false.png'))
+			self.editToolBar.setToolButtonStyle(Qt.ToolButtonIconOnly)
+		else:
+			self.checkToolBarEditShowNamesAction.setIcon(QIcon('icons/check-true.png'))
+			self.editToolBar.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
+	
 	def xyzzy(self):
 		self.statusbar.showMessage('No pasó nada.', 3000)
+	
+	#===================================================================
+	# Functions
 	
 	def getLastLines(self, file_name, N):
 		list_of_lines = []
@@ -1042,12 +1131,50 @@ class Window(QMainWindow):
 			if len(buffer_) > 0:
 				list_of_lines.append(buffer_[::-1])
 		return list(reversed(list_of_lines))
+	
+	def getFileTimes(self, filePath: str):
+		return (
+			os.path.getctime(filePath), 
+			os.path.getmtime(filePath),
+			os.path.getatime(filePath)
+		)
+	
+	def toDatetime(
+			self,
+			year: int, month: int, day:   int,
+			hour  = 0, minute = 0, second = 0
+		):
+		
+		return datetime.datetime(
+			year = year, month  = month,  day    = day,
+			hour = hour, minute = minute, second = second
+		)
+	
+	def changeFileTimes(self, filePath: str, values):
+		# Llamada al Win32 API para modificar los tiempos del archivo
+		handle = windll.kernel32.CreateFileW(filePath, 256, 0, None, 3, 128, None)
+		windll.kernel32.SetFileTime(handle, *values)
+		windll.kernel32.CloseHandle(handle)
+	
+	#===================================================================
+	#===================================================================
+	#===================================================================
+
+
 
 if __name__ == '__main__':
 	app = QApplication(sys.argv)
 	win = Window()
 	win.show()
 	sys.exit(app.exec_())
+	
+	# Pendientes:
+	
+	# Agregar lista de archivos con datos almacenados
+	# Agregar opción de ver lista de archivos con datos almacenados
+	# Agregar opción de eliminar archivos de datos desde la lista
+	
+	# Agregar la lista en archivo :FTC al propio código
 
 
 
