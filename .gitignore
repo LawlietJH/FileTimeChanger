@@ -4,6 +4,8 @@ otro/*.*
 *.exe
 *.cfg
 *.bmp
+*.txt
+*-v*.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
