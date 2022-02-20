@@ -28,7 +28,7 @@ import os
 
 __author__  = 'LawlietJH'				# Desarrollador
 __title__   = 'FileTimeChanger'			# Nombre
-__version__ = 'v1.0.2'					# Versión
+__version__ = 'v1.0.3'					# Versión
 
 #=======================================================================
 # Tomado de https://github.com/LawlietJH/Utils
@@ -83,6 +83,8 @@ class Window(QMainWindow):
 		self.setFixedSize(720, 360)
 		
 		self.listRecentFiles = ['Vacío']
+		self.qtyListRecentFiles = 7
+		self.filenameRecentFiles = '%temp%\\recentFiles.ftc'
 		self.encode = lambda data: base64.urlsafe_b64encode(data.encode()).decode()
 		self.decode = lambda data: base64.urlsafe_b64decode(data.encode()).decode()
 		self.HEADERFILE = self.encode('&&FTC&&').encode()
@@ -94,6 +96,7 @@ class Window(QMainWindow):
 		self.toFileTime  = lambda epoch: byref(wintypes.FILETIME(self.toTimestamp(epoch) & 0xFFFFFFFF, self.toTimestamp(epoch) >> 32))
 		self.timeToDate  = lambda time: datetime.datetime.fromtimestamp(time).strftime('%Y-%m-%d %H:%M:%S')
 		self.dateToTime  = lambda date: time.mktime(date.timetuple())
+		self.strToDate   = lambda date_time_str: datetime.strptime(date_time_str, '%Y-%m-%d %H:%M:%S')
 	
 	def _createActions(self):
 		#===============================================================
@@ -293,8 +296,9 @@ class Window(QMainWindow):
 		self.statusbar.showMessage('Ready', 3000)
 		# Adding a permanent message
 		t = QTime.currentTime().toPyTime()
-		t = '{}:{}'.format(str(t.hour).zfill(2),
-						   str(t.minute).zfill(2))
+		t = '{}:{}:{}'.format(str(t.hour).zfill(2),
+							  str(t.minute).zfill(2),
+							  str(t.second).zfill(2))
 		self.wcLabel = QLabel(t)
 		self.statusbar.addPermanentWidget(self.wcLabel)
 	
@@ -324,6 +328,7 @@ class Window(QMainWindow):
 		
 		datetimeC = self.datetimeCreatedOriginal.dateTime()
 		datetimeM = self.datetimeModifiedOriginal.dateTime()
+		datetimeA = self.datetimeAccessedOriginal.dateTime()
 		
 		created = {
 			'year':   datetimeC.date().toPyDate().year,
@@ -343,21 +348,33 @@ class Window(QMainWindow):
 			'second': datetimeM.time().toPyTime().second
 		}
 		
+		accessed = {
+			'year':   datetimeA.date().toPyDate().year,
+			'month':  datetimeA.date().toPyDate().month,
+			'day':    datetimeA.date().toPyDate().day,
+			'hour':   datetimeA.time().toPyTime().hour,
+			'minute': datetimeA.time().toPyTime().minute,
+			'second': datetimeA.time().toPyTime().second
+		}
+		
 		cdate = self.toDatetime(**created)
 		mdate = self.toDatetime(**modified)
+		adate = self.toDatetime(**accessed)
 		
 		ctime = self.toFileTime(self.dateToTime(cdate))
 		mtime = self.toFileTime(self.dateToTime(mdate))
+		atime = self.toFileTime(self.dateToTime(adate))
 		
 		values = []
 		values.append(ctime)
-		values.append(None)
+		values.append(atime)
 		values.append(mtime)
 		
 		self.changeFileTimes(fileName, values)				# Modifica los Tiempos del Archivo
 		
 		self.statusbar.showMessage('Restaurado.', 3000)
 		self.updateTimes(fileName)
+		
 		if self.btnRemoveFileTimes.isEnabled():
 			self.originalFileTimeCheck()
 	
@@ -435,23 +452,23 @@ class Window(QMainWindow):
 		# Datos actuales en los campos
 		datetimeC = QDateTime(self.dateCreated.date(),  self.timeCreated.time()).toPyDateTime()
 		datetimeM = QDateTime(self.dateModified.date(), self.timeModified.time()).toPyDateTime()
-		# ~ datetimeA = QDateTime(self.dateAccessed.date(), self.timeAccessed.time()).toPyDateTime()
+		datetimeA = QDateTime(self.dateAccessed.date(), self.timeAccessed.time()).toPyDateTime()
 		
 		datetimeC = datetime.datetime(datetimeC.year, datetimeC.month, datetimeC.day, datetimeC.hour, datetimeC.minute, datetimeC.second)
 		datetimeM = datetime.datetime(datetimeM.year, datetimeM.month, datetimeM.day, datetimeM.hour, datetimeM.minute, datetimeM.second)
-		# ~ datetimeA = datetime.datetime(datetimeA.year, datetimeA.month, datetimeA.day, datetimeA.hour, datetimeA.minute, datetimeA.second)
+		datetimeA = datetime.datetime(datetimeA.year, datetimeA.month, datetimeA.day, datetimeA.hour, datetimeA.minute, datetimeA.second)
 		
 		# Datos actuales en los campos originales
 		datetimeCO = self.datetimeCreatedOriginal.dateTime().toPyDateTime()
 		datetimeMO = self.datetimeModifiedOriginal.dateTime().toPyDateTime()
-		# ~ datetimeAO = self.datetimeAccessedOriginal.dateTime().toPyDateTime()
+		datetimeAO = self.datetimeAccessedOriginal.dateTime().toPyDateTime()
 		
 		dtC = datetimeC == datetimeCO
 		dtM = datetimeM == datetimeMO
-		# ~ dtA = datetimeA == datetimeAO
+		dtA = datetimeA == datetimeAO
 		
 		# Será True si la fecha y hora no han sido modificadas en los campos
-		same = dtC and dtM #and dtA
+		same = dtC and dtM and dtA
 		
 		self.btnRestoreFileTimes.setEnabled(not same)
 		
@@ -465,7 +482,7 @@ class Window(QMainWindow):
 			
 			datetimeC = self.originalFileTime['Created']
 			datetimeM = self.originalFileTime['Modified']
-			# ~ datetimeA = self.originalFileTime['Accessed']
+			datetimeA = self.originalFileTime['Accessed']
 			
 			datetimeC = datetimeC.split(' ')
 			datetimeC = datetimeC[0].split('-') + datetimeC[1].split(':')
@@ -475,37 +492,35 @@ class Window(QMainWindow):
 			datetimeM = datetimeM[0].split('-') + datetimeM[1].split(':')
 			datetimeM = QDateTime(*[int(d) for d in datetimeM])
 			
-			# ~ datetimeA = datetimeA.split(' ')
-			# ~ datetimeA = datetimeA[0].split('-') + datetimeA[1].split(':')
-			# ~ datetimeA = QDateTime(*[int(d) for d in datetimeA])
+			datetimeA = datetimeA.split(' ')
+			datetimeA = datetimeA[0].split('-') + datetimeA[1].split(':')
+			datetimeA = QDateTime(*[int(d) for d in datetimeA])
 			
 			self.datetimeCreatedOriginal.setDateTime(datetimeC)
 			self.datetimeModifiedOriginal.setDateTime(datetimeM)
-			# ~ self.datetimeAccessedOriginal.setDateTime(datetimeA)
+			self.datetimeAccessedOriginal.setDateTime(datetimeA)
 			
 			if not self.compareOriginalTimes():
-				
 				self.datetimeCreatedOriginal.setEnabled(True)
 				self.datetimeModifiedOriginal.setEnabled(True)
-				# ~ self.datetimeAccessedOriginal.setEnabled(True)
+				self.datetimeAccessedOriginal.setEnabled(True)
 			else:
-				
 				self.datetimeCreatedOriginal.setEnabled(False)
 				self.datetimeModifiedOriginal.setEnabled(False)
-				# ~ self.datetimeAccessedOriginal.setEnabled(False)
+				self.datetimeAccessedOriginal.setEnabled(False)
 		else:
 			
 			self.datetimeCreatedOriginal.setDateTime(QDateTime(2000, 1, 1, 0, 0, 0))
 			self.datetimeModifiedOriginal.setDateTime(QDateTime(2000, 1, 1, 0, 0, 0))
-			# ~ self.datetimeAccessedOriginal.setDateTime(QDateTime(2000, 1, 1, 0, 0, 0))
+			self.datetimeAccessedOriginal.setDateTime(QDateTime(2000, 1, 1, 0, 0, 0))
 			
-			# ~ self.datetimeAccessedOriginal.setEnabled(False)
 			self.datetimeCreatedOriginal.setEnabled(False)
 			self.datetimeModifiedOriginal.setEnabled(False)
+			self.datetimeAccessedOriginal.setEnabled(False)
 	
 	def updateTimes(self, fileName: str):
 		
-		# Estrae los tiempos del archivo:
+		# Extrae los tiempos del archivo:
 		timeCraw, timeMraw, timeAraw = self.getFileTimes(fileName)
 		dateC, timeC = self.timeToDate(timeCraw).split(' ')
 		dateM, timeM = self.timeToDate(timeMraw).split(' ')
@@ -540,42 +555,43 @@ class Window(QMainWindow):
 		
 		dateC, timeC = self.timeToDate(timeCraw).split(' ')
 		dateM, timeM = self.timeToDate(timeMraw).split(' ')
-		# ~ dateA, timeA = self.timeToDate(timeAraw).split(' ')
+		dateA, timeA = self.timeToDate(timeAraw).split(' ')
 		
 		dateCf = QDate(*[int(d) for d in dateC.split('-')]).toPyDate()
 		dateMf = QDate(*[int(d) for d in dateM.split('-')]).toPyDate()
-		# ~ dateAf = QDate(*[int(d) for d in dateA.split('-')]).toPyDate()
+		dateAf = QDate(*[int(d) for d in dateA.split('-')]).toPyDate()
 		
 		timeCf = QTime(*[int(t) for t in timeC.split(':')]).toPyTime()
 		timeMf = QTime(*[int(t) for t in timeM.split(':')]).toPyTime()
-		# ~ timeAf = QTime(*[int(t) for t in timeA.split(':')]).toPyTime()
+		timeAf = QTime(*[int(t) for t in timeA.split(':')]).toPyTime()
 		
 		#--------------------------------------------------------------
 		
 		# Datos actuales en los campos
 		dateCc = self.dateCreated.date().toPyDate()
 		dateMc = self.dateModified.date().toPyDate()
-		# ~ dateAc = self.dateAccessed.date().toPyDate()
+		dateAc = self.dateAccessed.date().toPyDate()
 		
 		timeCc = self.timeCreated.time().toPyTime()
 		timeCc = datetime.time(timeCc.hour, timeCc.minute, timeCc.second)
 		timeMc = self.timeModified.time().toPyTime()
 		timeMc = datetime.time(timeMc.hour, timeMc.minute, timeMc.second)
-		# ~ timeAc = self.timeAccessed.time().toPyTime()
-		# ~ timeAc = datetime.time(timeMc.hour, timeMc.minute, timeMc.second)
+		timeAc = self.timeAccessed.time().toPyTime()
+		timeAc = datetime.time(timeMc.hour, timeMc.minute, timeMc.second)
 		
 		#--------------------------------------------------------------
 		# Comparamos que los tiempos no hayan sido cambiados
 		
 		dateC = dateCf == dateCc
 		dateM = dateMf == dateMc
+		dateA = dateAf == dateAc
 		# ~ dateA = dateAf.toPyDate() == dateAc.toPyDate()
-		sameDate = dateC and dateM #and dateA
+		sameDate = dateC and dateM and dateA
 		
 		timeC = timeCf == timeCc
 		timeM = timeMf == timeMc
-		# ~ timeA = timeAf == timeAc
-		sameTime = timeC and timeM #and timeA
+		timeA = timeAf == timeAc
+		sameTime = timeC and timeM and timeA
 		
 		# Será True si la fecha y hora no han sido modificadas en los campos
 		same = sameDate and sameTime
@@ -598,11 +614,11 @@ class Window(QMainWindow):
 		labelOpenFile = QLabel('Ruta de Archivo:')
 		# ~ labelOpenFile.setFixedSize(80, 20)
 		
-		# Pos: 0, 1-3
+		# Pos: 0, 1-4
 		self.lineFileName = QLineEdit('')
 		self.lineFileName.setReadOnly(True)
 		
-		# Pos: 0, 4
+		# Pos: 0, 5
 		self.buttonOpenFile = QPushButton(
 			QIcon('icons/find.png'),
 			'Cargar Archivo...'
@@ -630,13 +646,13 @@ class Window(QMainWindow):
 		self.timeCreated.setTime(QTime.currentTime())
 		# ~ self.timeCreated.setTime(QTime(0, 0, 0))
 		
-		# Pos: 1, 3
-		self.labelCreatedOriginal = QLabel('FT Original:')
+		# Pos: 1, 4
+		self.labelCreatedOriginal = QLabel('Created Original:')
 		# ~ self.labelCreatedOriginal.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
 		# ~ self.labelCreatedOriginal.setVisible(True)
 		self.labelCreatedOriginal.setEnabled(False)
 		
-		# Pos: 1, 4
+		# Pos: 1, 5
 		self.datetimeCreatedOriginal = QDateTimeEdit()
 		self.datetimeCreatedOriginal.setDisplayFormat('hh:mm:ss dd/MM/yyyy')
 		self.datetimeCreatedOriginal.setReadOnly(True)
@@ -661,11 +677,11 @@ class Window(QMainWindow):
 		self.timeModified.setDisplayFormat('hh:mm:ss')
 		self.timeModified.setTime(QTime.currentTime())
 		
-		# Pos: 2, 3
-		self.labelModifiedOriginal = QLabel('FT Original:')
+		# Pos: 2, 4
+		self.labelModifiedOriginal = QLabel('Modified Original:')
 		self.labelModifiedOriginal.setEnabled(False)
 		
-		# Pos: 2, 4
+		# Pos: 2, 5
 		self.datetimeModifiedOriginal = QDateTimeEdit()
 		self.datetimeModifiedOriginal.setDisplayFormat('hh:mm:ss dd/MM/yyyy')
 		self.datetimeModifiedOriginal.setReadOnly(True)
@@ -682,35 +698,24 @@ class Window(QMainWindow):
 		self.dateAccessed.setMaximumDate(QDate(3000, 12, 31))
 		self.dateAccessed.setDisplayFormat('dd/MM/yyyy')
 		self.dateAccessed.setDate(QDate.currentDate())
-		self.dateAccessed.setEnabled(False)
+		# ~ self.dateAccessed.setEnabled(False)
 		
 		# Pos: 3, 2
 		self.timeAccessed = QTimeEdit()
 		self.timeAccessed.setTimeRange(QTime(00, 00, 00), QTime(24, 00, 00))
 		self.timeAccessed.setDisplayFormat('hh:mm:ss')
 		self.timeAccessed.setTime(QTime.currentTime())
-		self.timeAccessed.setEnabled(False)
-		
-		# ~ # Pos: 3, 3
-		# ~ self.labelAccessedOriginal = QLabel('Original:')
-		# ~ self.labelAccessedOriginal.setEnabled(False)
-		
-		# ~ # Pos: 3, 4
-		# ~ self.datetimeAccessedOriginal = QDateTimeEdit()
-		# ~ self.datetimeAccessedOriginal.setDisplayFormat('hh:mm:ss dd/MM/yyyy')
-		# ~ self.datetimeAccessedOriginal.setReadOnly(True)
-		# ~ self.datetimeAccessedOriginal.setEnabled(False)
+		# ~ self.timeAccessed.setEnabled(False)
 		
 		# Pos: 3, 4
-		self.btnRemoveFileTimes = QPushButton(
-			QIcon('icons/remove.png'),
-			'Elimina Tiempos Originales'
-			)
-		self.btnRemoveFileTimes.setEnabled(False)
-		self.btnRemoveFileTimes.setToolTip(
-			'Elimina del archivo los\n'
-			'tiempos originales.'
-		)
+		self.labelAccessedOriginal = QLabel('Accessed Original:')
+		self.labelAccessedOriginal.setEnabled(False)
+		
+		# Pos: 3, 5
+		self.datetimeAccessedOriginal = QDateTimeEdit()
+		self.datetimeAccessedOriginal.setDisplayFormat('hh:mm:ss dd/MM/yyyy')
+		self.datetimeAccessedOriginal.setReadOnly(True)
+		self.datetimeAccessedOriginal.setEnabled(False)
 		
 		#---------------------------------------------------------------
 		
@@ -735,7 +740,20 @@ class Window(QMainWindow):
 			'y respalda los originales.'
 		)
 		
-		# Pos: 4, 4
+		# Pos: 4, 5
+		self.btnRemoveFileTimes = QPushButton(
+			QIcon('icons/remove.png'),
+			'Elimina Tiempos Originales'
+			)
+		self.btnRemoveFileTimes.setEnabled(False)
+		self.btnRemoveFileTimes.setToolTip(
+			'Elimina del archivo los\n'
+			'tiempos originales.'
+		)
+		
+		#---------------------------------------------------------------
+		
+		# Pos: 5, 5
 		self.btnRestoreFileTimes = QPushButton(
 			QIcon('icons/reload.png'),
 			'Restaurar Datos Originales'
@@ -758,30 +776,33 @@ class Window(QMainWindow):
 		self.grid.setColumnStretch(1, 1)
 		self.grid.setColumnStretch(2, 1)
 		self.grid.setColumnStretch(3, 1)
-		self.grid.setColumnStretch(4, 2)
+		self.grid.setColumnStretch(4, 1)
+		self.grid.setColumnStretch(5, 2)
 		
 		# Add Widgets
-		self.grid.addWidget(labelOpenFile,       0, 0, alignment=Qt.AlignRight)
-		self.grid.addWidget(self.lineFileName,   0, 1, 1, 3)
-		self.grid.addWidget(self.buttonOpenFile, 0, 4)
-		self.grid.addWidget(labelCreated,        1, 0, alignment=Qt.AlignRight)
-		self.grid.addWidget(self.timeCreated,    1, 1)
-		self.grid.addWidget(self.dateCreated,    1, 2)
-		self.grid.addWidget(labelModified,       2, 0, alignment=Qt.AlignRight)
-		self.grid.addWidget(self.timeModified,   2, 1)
-		self.grid.addWidget(self.dateModified,   2, 2)
-		self.grid.addWidget(labelAccessed,       3, 0, alignment=Qt.AlignRight)
-		self.grid.addWidget(self.timeAccessed,   3, 1)
-		self.grid.addWidget(self.dateAccessed,   3, 2)
+		self.grid.addWidget(labelOpenFile,           0, 0, alignment=Qt.AlignRight)
+		self.grid.addWidget(self.lineFileName,       0, 1, 1, 4)
+		self.grid.addWidget(self.buttonOpenFile,     0, 5)
+		self.grid.addWidget(labelCreated,            1, 0, alignment=Qt.AlignRight)
+		self.grid.addWidget(self.timeCreated,        1, 1)
+		self.grid.addWidget(self.dateCreated,        1, 2)
+		self.grid.addWidget(labelModified,           2, 0, alignment=Qt.AlignRight)
+		self.grid.addWidget(self.timeModified,       2, 1)
+		self.grid.addWidget(self.dateModified,       2, 2)
+		self.grid.addWidget(labelAccessed,           3, 0, alignment=Qt.AlignRight)
+		self.grid.addWidget(self.timeAccessed,       3, 1)
+		self.grid.addWidget(self.dateAccessed,       3, 2)
 		self.grid.addWidget(self.btnLoadCurrentTime, 4, 1)
-		self.grid.addWidget(self.btnUpFileTimes, 4, 2)
+		self.grid.addWidget(self.btnUpFileTimes,     4, 2)
 		
-		self.grid.addWidget(self.labelCreatedOriginal,     1, 3, alignment=Qt.AlignRight)
-		self.grid.addWidget(self.datetimeCreatedOriginal,  1, 4)
-		self.grid.addWidget(self.labelModifiedOriginal,    2, 3, alignment=Qt.AlignRight)
-		self.grid.addWidget(self.datetimeModifiedOriginal, 2, 4)
-		self.grid.addWidget(self.btnRemoveFileTimes,  3, 4)
-		self.grid.addWidget(self.btnRestoreFileTimes, 4, 4)
+		self.grid.addWidget(self.labelCreatedOriginal,     1, 4, alignment=Qt.AlignRight)
+		self.grid.addWidget(self.datetimeCreatedOriginal,  1, 5)
+		self.grid.addWidget(self.labelModifiedOriginal,    2, 4, alignment=Qt.AlignRight)
+		self.grid.addWidget(self.datetimeModifiedOriginal, 2, 5)
+		self.grid.addWidget(self.labelAccessedOriginal,    3, 4, alignment=Qt.AlignRight)
+		self.grid.addWidget(self.datetimeAccessedOriginal, 3, 5)
+		self.grid.addWidget(self.btnRemoveFileTimes,       4, 5)
+		self.grid.addWidget(self.btnRestoreFileTimes,      5, 5)
 	
 	#===================================================================
 	# FileTime Controllers
@@ -789,6 +810,7 @@ class Window(QMainWindow):
 	def appendOriginalFileTimeAgain(self):
 		
 		self.btnRemoveFileTimes.setEnabled(True)
+		self.btnRestoreFileTimes.setEnabled(True)
 		self.appendOriginalFileTimeAction.setEnabled(False)
 		self.removeOriginalFileTimeAction.setEnabled(True)
 		self.appendOriginalFileTime()
@@ -808,7 +830,7 @@ class Window(QMainWindow):
 		datetimeM = self.timeToDate(timeMraw)
 		datetimeA = self.timeToDate(timeAraw)
 		fileTimes = {
-			'Created': datetimeC,
+			'Created':  datetimeC,
 			'Modified': datetimeM,
 			'Accessed': datetimeA
 		}
@@ -827,13 +849,14 @@ class Window(QMainWindow):
 			f.write(jsonFileTimes)
 		
 		self.originalFileTime = fileTimes
-		self.updateFileTimes()
+		# ~ self.updateFileTimes()
 	
 	def extractOriginalFileTime(self, fileName=None):
 		
 		if not fileName: fileName = self.lineFileName.text()
 		if not os.path.isfile(fileName):
 			self.btnRemoveFileTimes.setEnabled(False)
+			self.btnRestoreFileTimes.setEnabled(False)
 			self.appendOriginalFileTimeAction.setEnabled(False)
 			self.removeOriginalFileTimeAction.setEnabled(False)
 			return
@@ -858,11 +881,13 @@ class Window(QMainWindow):
 					return
 				data = json.loads(data)
 				self.btnRemoveFileTimes.setEnabled(True)
+				self.btnRestoreFileTimes.setEnabled(True)
 				self.appendOriginalFileTimeAction.setEnabled(False)
 				self.removeOriginalFileTimeAction.setEnabled(True)
 				return data
 			else:
 				self.btnRemoveFileTimes.setEnabled(False)
+				self.btnRestoreFileTimes.setEnabled(False)
 				self.appendOriginalFileTimeAction.setEnabled(True)
 				self.removeOriginalFileTimeAction.setEnabled(False)
 				return
@@ -876,12 +901,14 @@ class Window(QMainWindow):
 			os.remove(fileName+':FTC')
 			self.datetimeCreatedOriginal.setEnabled(False)
 			self.datetimeModifiedOriginal.setEnabled(False)
+			self.datetimeAccessedOriginal.setEnabled(False)
 			self.datetimeCreatedOriginal.setDateTime(QDateTime(2000, 1, 1, 0, 0, 0))
 			self.datetimeModifiedOriginal.setDateTime(QDateTime(2000, 1, 1, 0, 0, 0))
+			self.datetimeAccessedOriginal.setDateTime(QDateTime(2000, 1, 1, 0, 0, 0))
 			self.btnRemoveFileTimes.setEnabled(False)
+			self.btnRestoreFileTimes.setEnabled(False)
 			self.appendOriginalFileTimeAction.setEnabled(True)
 			self.removeOriginalFileTimeAction.setEnabled(False)
-			self.btnRestoreFileTimes.setEnabled(False)
 			if update: self.updateFileTimes()
 			return True
 	
@@ -910,12 +937,12 @@ class Window(QMainWindow):
 	
 	def updateClock(self):
 		
-		t = datetime.datetime.now().strftime('%H:%M')
+		t = datetime.datetime.now().strftime('%H:%M:%S')
 		self.wcLabel.setText(t)
 		
-		if not self.lineFileName.text():
-			self.dateAccessed.setDate(QDate.currentDate())
-			self.timeAccessed.setTime(QTime.currentTime())
+		# ~ if not self.lineFileName.text():
+			# ~ self.dateAccessed.setDate(QDate.currentDate())
+			# ~ self.timeAccessed.setTime(QTime.currentTime())
 	
 	def openFile(self, fileName=None):
 		if not fileName:
@@ -932,11 +959,11 @@ class Window(QMainWindow):
 				';;Documento (*.pdf *.docx)',
 				options=options
 			)
-		fileName = fileName.replace('/', '\\') 
+		fileName = fileName.replace('/', '\\')
 		if fileName and not fileName == self.lineFileName.text():
 			self.lineFileName.setText(fileName)
 			if not fileName in self.listRecentFiles:
-				if len(self.listRecentFiles) > 7:
+				if len(self.listRecentFiles) >= self.qtyListRecentFiles:
 					self.listRecentFiles.pop(0)
 				elif self.listRecentFiles == ['Vacío']:
 					self.listRecentFiles = []
@@ -949,6 +976,7 @@ class Window(QMainWindow):
 			self.updateTimes(fileName)
 			self.originalFileTimeCheck()
 			self.btnRemoveFileTimes.setEnabled(True)
+			self.btnRestoreFileTimes.setEnabled(True)
 			self.appendOriginalFileTimeAction.setEnabled(False)
 			self.removeOriginalFileTimeAction.setEnabled(True)
 			
@@ -1053,23 +1081,26 @@ class Window(QMainWindow):
 		
 		self.datetimeCreatedOriginal.setEnabled(False)
 		self.datetimeModifiedOriginal.setEnabled(False)
+		self.datetimeAccessedOriginal.setEnabled(False)
 		self.datetimeCreatedOriginal.setDateTime(QDateTime(2000, 1, 1, 0, 0, 0))
 		self.datetimeModifiedOriginal.setDateTime(QDateTime(2000, 1, 1, 0, 0, 0))
+		self.datetimeAccessedOriginal.setDateTime(QDateTime(2000, 1, 1, 0, 0, 0))
 		self.btnRemoveFileTimes.setEnabled(False)
+		self.btnRestoreFileTimes.setEnabled(False)
 		self.appendOriginalFileTimeAction.setEnabled(False)
 		self.removeOriginalFileTimeAction.setEnabled(False)
-		self.btnRestoreFileTimes.setEnabled(False)
 		
 		self.copyFileNameAction.setEnabled(False)
 		self.cutFileNameAction.setEnabled(False)
 		self.clearFileNameAction.setEnabled(False)
 		
-		self.dateCreated.setDate(QDate.currentDate())
-		self.dateModified.setDate(QDate.currentDate())
-		self.dateAccessed.setDate(QDate.currentDate())
-		self.timeCreated.setTime(QTime.currentTime())
-		self.timeModified.setTime(QTime.currentTime())
-		self.timeAccessed.setTime(QTime.currentTime())
+		# ~ self.dateCreated.setDate(QDate.currentDate())
+		# ~ self.dateModified.setDate(QDate.currentDate())
+		# ~ self.dateAccessed.setDate(QDate.currentDate())
+		# ~ self.timeCreated.setTime(QTime.currentTime())
+		# ~ self.timeModified.setTime(QTime.currentTime())
+		# ~ self.timeAccessed.setTime(QTime.currentTime())
+		self.updateTimesWithCurrentDateTime()
 	
 	def updateMenuCheckFile(self):
 		isMovable = not self.fileToolBar.isMovable()
